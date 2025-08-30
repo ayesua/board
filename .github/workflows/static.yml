@@ -1,0 +1,294 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>TASE Dashboard — Manager View</title><style>
+:root{--bg:#0b0b0c;--panel:#121214;--line:#ffffff22;--muted:#ffffff80;--text:#fff;--pri:#6a5af9;--ok:#00c896;--warn:#ffcc00;--bad:#ff6b6b}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Arial}
+.wrap{max-width:1280px;margin:0 auto;padding:16px}
+.topbar{position:sticky;top:0;z-index:20;background:#0007;backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:8px}.sp{flex:1}
+.grid{display:grid;gap:12px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.inp,select,textarea{width:100%;border:1px solid var(--line);background:#0b0b0c;color:#fff;border-radius:8px;padding:6px}
+.btn{border:1px solid var(--line);background:#0000;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer;transition:.2s}
+.btn:hover{background:#ffffff12}.btn:disabled{opacity:.45;cursor:not-allowed}
+.mini{font-size:12px;color:#ffffffa6}.badge{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:2px 6px;background:#0004}
+.pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:#ffffff12}
+.sw{display:inline-block;width:12px;height:12px;border-radius:4px;border:1px solid #ffffff40}
+.ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:8px 16px;cursor:pointer;border-radius:6px 6px 0 0;border:1px solid transparent;border-bottom:none;margin-bottom:-1px}
+.tab.active{background:var(--panel);border-color:var(--line)}.tabpane{display:none}.tabpane.active{display:block}
+.stack{height:16px;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--bg);display:flex}
+.chart{height:200px;position:relative;margin-top:8px}.chart .bar{position:absolute;bottom:0;border-radius:4px 4px 0 0;background:var(--pri)}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.day{aspect-ratio:1;border:1px solid var(--line);border-radius:6px;padding:4px;position:relative}
+.day.cur{border-color:var(--pri)}.daynum{font-size:12px;color:var(--muted)}.icons{position:absolute;left:4px;right:4px;bottom:4px;display:flex;gap:2px;flex-wrap:wrap}.dot{width:8px;height:8px;border-radius:50%}
+.menu{position:fixed;z-index:1000;min-width:220px;border:1px solid var(--line);background:#0f0f10;border-radius:10px;box-shadow:0 8px 24px #0008;display:none}
+.menu.active{display:block}.menu .hd{font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);padding:6px 8px}
+.menu button{width:100%;text-align:left;background:transparent;border:0;color:#fff;padding:8px;border-bottom:1px solid #ffffff12;cursor:pointer}
+.menu button:hover{background:#ffffff12}
+.overlay{position:fixed;inset:0;background:#0008;display:none;place-items:center;z-index:1000}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:400px;max-width:95%}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr}}
+.vchart{display:flex;gap:12px;align-items:flex-end;min-height:220px;overflow-x:auto;padding-bottom:8px}
+.vcol{display:flex;flex-direction:column;align-items:center;min-width:48px}
+.vstack{display:flex;flex-direction:column-reverse;justify-content:flex-start;width:28px;height:180px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0b0b0c;position:relative}
+.vseg{width:100%;cursor:context-menu}
+.vlabel{margin-top:6px;max-width:64px;text-align:center;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style></head><body>
+<div class="topbar"><div class="wrap row" style="padding:8px 16px">
+  <strong>TASE Dashboard — Manager View</strong><div class="sp"></div>
+  <span id="counters" class="badge mini">—</span>
+  <button class="btn" data-act="open-task">Add Task</button>
+  <button class="btn" data-act="open-member">Add Member</button>
+  <button class="btn" data-act="open-award">Add Award</button>
+  <input id="csv" type="file" hidden accept=".csv"/>
+  <button class="btn" data-act="import">Import CSV</button>
+  <button class="btn" data-act="export">Export CSV</button>
+  <button id="undo" class="btn" disabled>Undo</button>
+  <button id="redo" class="btn" disabled>Redo</button>
+</div></div>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" data-tab="dash">Dashboard</div>
+    <div class="tab" data-tab="ana">Analytics</div>
+    <div class="tab" data-tab="alerts">Alerts</div>
+    <div class="tab" data-tab="time">Timeline</div>
+    <div class="tab" data-tab="awards">Awards</div>
+  </div>
+
+  <div id="dash" class="tabpane active"><div id="app" class="grid" style="padding-top:16px"></div></div>
+  <div id="ana" class="tabpane"><div id="anaRoot" class="grid"></div></div>
+  <div id="alerts" class="tabpane"><div class="card"><h3>Risk Alerts</h3><div id="alertsBox"></div></div></div>
+  <div id="time" class="tabpane"><div class="card">
+    <div class="row" style="margin:8px 0"><button class="btn" data-act="month" data-delta="-1">← Prev</button><div class="sp" style="text-align:center"><h4 id="monthLbl">Month</h4></div><button class="btn" data-act="month" data-delta="1">Next →</button></div>
+    <div id="cal" class="calendar"></div>
+    <div class="card" style="margin-top:12px"><h4 id="selDate">Select a date</h4><div id="dateTasks"></div></div>
+  </div></div>
+  <div id="awards" class="tabpane"><div class="card"><h3>Awards</h3><div id="awardsBox" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div></div></div>
+</div>
+
+<!-- Modals -->
+<div id="taskM" class="overlay"><div class="modal"><form id="taskF">
+  <h3 id="taskTitle">Task</h3>
+  <div class="grid g2" style="gap:10px;margin-top:6px">
+    <div><div class="mini">Deliverable</div><select class="inp" name="type" required></select></div>
+    <div><div class="mini">Number</div><input class="inp" name="number"/></div>
+    <div><div class="mini">Hours</div><select class="inp" name="hours" required><option>0-2</option><option>2-4</option><option>4-8</option><option>8+</option></select></div>
+    <div><div class="mini">Criticality</div><select class="inp" name="criticality" required><option>Low</option><option>Medium</option><option>High</option></select></div>
+    <div><div class="mini">Start</div><input type="date" class="inp" name="date" required></div>
+    <div><div class="mini">Due</div><input type="date" class="inp" name="due"></div>
+    <div style="grid-column:span 2"><div class="mini">Notes</div><input class="inp" name="notes"></div>
+    <div style="grid-column:span 2"><div class="mini">Link</div><input class="inp" name="link"></div>
+  </div>
+  <div class="row" style="margin:8px 0"><div class="mini">Members</div><div id="taskMembers" class="row" style="flex-wrap:wrap"></div></div>
+  <input type="hidden" name="id"/>
+  <div class="row" style="margin-top:8px"><label class="row" style="cursor:pointer"><input type="checkbox" name="shoutout"><div class="mini">Shoutout</div></label><div class="sp"></div><button class="btn" data-act="modal-close" data-target="#taskM" type="button">Cancel</button><button class="btn" type="submit">Save</button></div>
+</form></div></div>
+
+<div id="memM" class="overlay"><div class="modal"><form id="memF">
+  <h3>Member</h3>
+  <div class="grid g2" style="gap:10px;margin-top:6px">
+    <div><div class="mini">Name</div><input class="inp" name="name" required></div>
+    <div><div class="mini">Shift</div><select class="inp" name="shift"><option>Early</option><option>Late</option><option>Night</option></select></div>
+    <div><div class="mini">Days</div><select class="inp" name="days"><option>Mon-Fri</option><option>Wed-Sun</option></select></div>
+    <div><div class="mini">Country</div><select class="inp" name="country"><option>MX</option><option>PT</option></select></div>
+  </div>
+  <div class="row" style="margin-top:8px"><div class="sp"></div><button class="btn" data-act="modal-close" data-target="#memM" type="button">Cancel</button><button class="btn" type="submit">Save</button></div>
+</form></div></div>
+
+<div id="awardM" class="overlay"><div class="modal"><form id="awardF">
+  <h3>Award</h3>
+  <div class="grid g2" style="gap:10px;margin-top:6px">
+    <div><div class="mini">Type</div><select class="inp" name="type"><option>TASE Award</option><option>Shout Out External</option><option>Shout Out Internal</option></select></div>
+    <div><div class="mini">Recipient</div><select class="inp" name="recipient"></select></div>
+    <div style="grid-column:span 2"><div class="mini">Description</div><textarea class="inp" name="description" rows="3"></textarea></div>
+    <div><div class="mini">Date</div><input type="date" class="inp" name="date"></div>
+  </div>
+  <div class="row" style="margin-top:8px"><div class="sp"></div><button class="btn" data-act="modal-close" data-target="#awardM" type="button">Cancel</button><button class="btn" type="submit">Save</button></div>
+</form></div></div>
+
+<!-- Context Menu (Deliverables only) -->
+<div id="ctx" class="menu" role="menu" aria-hidden="true"><div id="ctxHd" class="hd"></div><div id="ctxBtns"></div></div>
+
+<script>(()=>{"use strict";
+// ===== helpers =====
+const $=s=>document.querySelector(s),A=(f,a)=>a.map(f).join(""),H=(t,a={},ch=[])=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a))k==="style"?e.style.cssText=v:k.startsWith("on")?e.addEventListener(k.slice(2),v):e.setAttribute(k,v);ch.forEach(c=>e.append(c));return e};
+const uid=()=>Math.random().toString(36).slice(2,10),fmt=d=>new Date(d).toISOString().slice(0,10),today=fmt(new Date());
+const dateOnly=d=>new Date(new Date(d).toISOString().slice(0,10));
+const within=(ds,s,e)=>{if(!ds)return!0;const d=dateOnly(ds);return(!s||d>=dateOnly(s))&&(!e||d<=dateOnly(e))};
+const HOURS={"0-2":2,"2-4":4,"4-8":8,"8+":10},h2w=h=>h==="0-2"?1:h==="2-4"?1.2:h==="4-8"?1.3:1.5;
+// safe CSV helpers (newline-safe)
+const CSV_CELL_RE=new RegExp('[",\n]');
+const csvCell=v=>{const s=String(v??"");return CSV_CELL_RE.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+const csvRow=a=>a.map(csvCell).join(",");
+
+// ===== state =====
+const STORAGE="tase-manager-v12";
+const DEF={Escalation:{color:"#9b0000",weight:5},UA:{color:"#ff2600",weight:4},"UA Effective Ass":{color:"#ffa500",weight:2},ASR:{color:"#0023ff",weight:2},STAR:{color:"#8a2be2",weight:4},"Security Uplift":{color:"#6aa7d6",weight:3},TAR:{color:"#ff1a1a",weight:3},"Public Presentation":{color:"#cc00ff",weight:3}};
+let S=(()=>{try{const r=localStorage.getItem(STORAGE);if(r)return JSON.parse(r)}catch{}const t=today;return{deliverables:DEF,members:[{name:"David",shift:"Early",days:"Mon-Fri",country:"MX"},{name:"Diego",shift:"Late",days:"Mon-Fri",country:"MX"},{name:"Leo",shift:"Night",days:"Wed-Sun",country:"PT"},{name:"Nestor",shift:"Early",days:"Wed-Sun",country:"MX"}],tasks:[{id:uid(),type:"Escalation",criticality:"High",members:["David"],date:t,due:t,notes:"Client A escalated",link:"http://example.com",hours:"0-2"},{id:uid(),type:"UA",criticality:"High",members:["David","Diego"],date:t,due:t,shoutout:!0,notes:"Unusual activity",hours:"2-4"},{id:uid(),type:"STAR",criticality:"Low",members:["David"],date:t,due:t,notes:"Standard review",hours:"4-8"},{id:uid(),type:"ASR",number:"ASR-221",criticality:"Medium",members:["Leo","Nestor"],date:t,due:t,notes:"Auto review",hours:"0-2"},{id:uid(),type:"Security Uplift",criticality:"Medium",members:["Nestor"],date:t,due:t,shoutout:!0,notes:"Firewall rules",hours:"0-2"}],awards:[{id:uid(),type:"TASE Award",recipient:"David",description:"Outstanding performance",date:t},{id:uid(),type:"Shout Out Internal",recipient:"Diego",description:"Great teamwork",date:t},{id:uid(),type:"Shout Out External",recipient:"Leo",description:"Client appreciation",date:t}],filters:{start:fmt(new Date(Date.now()-14*864e5)),end:fmt(new Date()),fDeliverable:"All",fShift:"All",fDays:"All",fCountry:"All"},ana:null}})();
+S.ana=S.ana||JSON.parse(JSON.stringify(S.filters));
+let hist=[],fut=[],month=new Date();
+const save=()=>{try{localStorage.setItem(STORAGE,JSON.stringify(S))}catch{}},push=()=>{hist.push(JSON.parse(JSON.stringify(S)));fut=[];updUR()},undo=()=>{if(!hist.length)return;const p=hist.pop();fut.push(JSON.parse(JSON.stringify(S)));S=p;render()},redo=()=>{if(!fut.length)return;const n=fut.pop();hist.push(JSON.parse(JSON.stringify(S)));S=n;render()},updUR=()=>{$('#undo').disabled=!hist.length;$('#redo').disabled=!fut.length};
+
+// ===== derived =====
+const members=(ana=false)=>{const f=ana?S.ana:S.filters;return S.members.filter(m=>(f.fShift==='All'||m.shift===f.fShift)&&(f.fDays==='All'||m.days===f.fDays)&&(f.fCountry==='All'||m.country===f.fCountry))};
+const tasks=({needMem=false,ana=false}={})=>{const f=ana?S.ana:S.filters,memSet=new Set(members(ana).map(m=>m.name));return S.tasks.filter(t=>within(t.date,f.start,f.end)&&(f.fDeliverable==='All'||t.type===f.fDeliverable)&&(!needMem||(t.members||[]).some(m=>memSet.has(m))))};
+const mapByMember=(mems,ana=false)=>{const map=new Map(mems.map(m=>[m.name,[]]));tasks({needMem:true,ana}).forEach(t=>(t.members||[]).forEach(m=>{if(map.has(m))map.get(m).push(t)}));return map};
+const stacks=(ana=false)=>{const mems=members(ana),by=mapByMember(mems,ana),rows=mems.map(m=>{const ts=by.get(m.name)||[];let tw=0,th=0;const seg=[];ts.forEach(t=>{const d=S.deliverables[t.type]||{weight:1,color:'#777'},w=d.weight,hw=h2w(t.hours),wd=w*hw;tw+=wd;th+=hw;seg.push({id:t.id,type:t.type,hours:t.hours,weight:w,wd,color:d.color})});return{name:m.name,seg,tw,th}}),mx=Math.max(...rows.map(r=>r.tw),1);return{rows,mx}};
+
+// ===== UI bits =====
+const box=(title,body)=>`<div class='card'><div class='row'><strong>${title}</strong><div class='sp'></div></div>${body||""}</div>`;
+const filtersUI=(f,p)=>`<div class='grid g2' style='gap:6px'>${A(([k,l,h])=>`<div><div class='mini'>${l}</div>${h}</div>`,[["start","Start",`<input type='date' class='inp' value='${f.start}' data-${p}='start'>`],["end","End",`<input type='date' class='inp' value='${f.end}' data-${p}='end'>`],["fDeliverable","Deliverable",`<select class='inp' data-${p}='fDeliverable'><option>All</option>${A(k=>`<option ${f.fDeliverable===k?'selected':''}>${k}</option>`,Object.keys(S.deliverables))}</select>`],["fShift","Shift",`<select class='inp' data-${p}='fShift'>${A(v=>`<option ${f.fShift===v?'selected':''}>${v}</option>`,['All','Early','Late','Night'])}</select>`],["fDays","Days",`<select class='inp' data-${p}='fDays'>${A(v=>`<option ${f.fDays===v?'selected':''}>${v}</option>`,['All','Mon-Fri','Wed-Sun'])}</select>`],["fCountry","Country",`<select class='inp' data-${p}='fCountry'>${A(v=>`<option ${f.fCountry===v?'selected':''}>${v}</option>`,['All','MX','PT'])}</select>`]])}<div class='row'><button class='btn' data-${p}='reset'>Reset</button></div></div>`;
+const wireFilters=(box,prefix)=>{box.addEventListener('input',e=>{const k=Object.keys(e.target.dataset).find(x=>x.startsWith(prefix));if(!k)return;push();const tgt=prefix==='f'?S.filters:S.ana;tgt[e.target.dataset[k]]=e.target.value;render()});const r=box.querySelector(`[data-${prefix}='reset']`);r&&(r.onclick=()=>{push();const base={start:fmt(new Date(Date.now()-14*864e5)),end:fmt(new Date()),fDeliverable:'All',fShift:'All',fDays:'All',fCountry:'All'};prefix==='f'?S.filters=base:S.ana=JSON.parse(JSON.stringify(base));render()})};
+
+// ===== sections =====
+function delivSec(){const el=document.createElement('section');el.className='card';el.innerHTML=`<div class='row'><strong>Deliverables</strong></div><div class='grid' style='grid-template-columns:repeat(3,1fr)'>${A(k=>{const d=S.deliverables[k];return`<div class='row' data-d='${k}'><input type='color' class='inp' style='width:42px' value='${d.color}' data-r='c'><div class='ellipsis' style='width:160px' data-dlv='${k}' title='Right‑click for options'>${k}</div><span class='mini'>w</span><input type='number' class='inp' style='width:60px' min='0' step='1' value='${d.weight}' data-r='w'><button class='btn mini' data-r='rm'>Remove</button></div>`},Object.keys(S.deliverables))}</div><form id='newD' class='row' style='margin-top:8px'><input name='n' class='inp' placeholder='New deliverable' style='max-width:200px'><input name='c' type='color' class='inp' style='width:42px' value='#4488ff'><span class='mini'>w</span><input name='w' class='inp' style='width:60px' type='number' value='1' min='0'><button class='btn'>Add</button></form>`;
+  // inline edits
+  el.oninput=e=>{const row=e.target.closest('[data-d]');if(!row)return;const n=row.dataset.d;push();if(e.target.dataset.r==='c')S.deliverables[n].color=e.target.value;else if(e.target.dataset.r==='w')S.deliverables[n].weight=+e.target.value||0;render()};
+  // simple buttons
+  el.onclick=e=>{const row=e.target.closest('[data-d]');if(!row)return;if(e.target.dataset.r==='rm'){if(!confirm('Remove deliverable?'))return;push();const n=row.dataset.d;delete S.deliverables[n];S.tasks.forEach(t=>{if(t.type===n)t.type='(deleted)'});render()}};
+  // right‑click ONLY for deliverables
+  el.addEventListener('contextmenu',e=>{const dv=e.target.closest('[data-dlv]');if(dv){e.preventDefault();openDeliverableMenu(e,dv.dataset.dlv)}});
+  // add new
+  el.querySelector('#newD').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),n=(f.get('n')||'').toString().trim();if(!n)return;push();S.deliverables[n]={color:f.get('c'),weight:+(f.get('w')||0)};render()};
+  return el}
+
+function membersSec(){const el=document.createElement('div');el.className='grid g3';const mems=members(),by=mapByMember(mems);
+  el.innerHTML=A(m=>{const ts=(by.get(m.name)||[]).slice().sort((a,b)=>a.type.localeCompare(b.type)),items=ts.length?A(t=>`<div class='card' data-t='${t.id}' data-m='${m.name}'><div class='row'><span class='pill' data-dlv='${t.type}' title='Right‑click for options' style='background:${(S.deliverables[t.type]?.color||"#999")}22'><span class='sw' style='background:${S.deliverables[t.type]?.color||"#999"}'></span>${t.type} <span class='mini'>(w${S.deliverables[t.type]?.weight??1}|h${h2w(t.hours)??1})</span></span><span class='mini'>${t.number||'—'}</span><div class='sp'></div><span class='mini'>${t.criticality||'—'}</span></div><div class='mini ellipsis'>${t.notes||t.link||''}</div><div class='mini'>Start ${t.date||'—'} • Due ${t.due||'—'}</div><div class='mini'>${(t.members||[]).join(', ')}</div></div>`,ts):"<div class='mini'>No tasks</div>";
+    return`<div class='card' data-mb='${m.name}'><div class='row'><div><strong>${m.name}</strong><div class='mini'>${m.shift} • ${m.days} • ${m.country}</div></div><div class='sp'></div><button class='btn mini' data-act='member-edit' data-member='${m.name}'>Edit</button></div><div class='grid'>${items}</div></div>`},mems);
+  el.addEventListener('contextmenu',e=>{const dv=e.target.closest('[data-dlv]');if(dv){e.preventDefault();openDeliverableMenu(e,dv.dataset.dlv)}});
+  return el}
+
+function totalsSec(){const Sx=stacks();const html=A(r=>`<div class='row'><div style='width:160px' class='ellipsis'><strong>${r.name}</strong></div><div class='sp stack'>${r.seg.length?A(s=>`<div class='seg' title='${s.type} • ${s.hours} × w${s.weight}=${s.wd.toFixed(2)}' style='width:${Math.max(1,(s.wd/Sx.mx)*100)}%;background:${s.color}'></div>`,r.seg):`<div class='seg' style='width:100%'></div>`}</div><div class='mini' style='width:120px;text-align:right'>${r.tw.toFixed(2)} <span class='mini'>(${r.th}h)</span></div></div>`,Sx.rows);return H('section',{class:'card'},[H('div',{class:'row'},[H('strong',{},['Work totals (weighted)']),H('div',{class:'sp'}),H('span',{class:'mini'},[`Max ${Sx.mx.toFixed(2)}`])]),H('div',{class:'grid'},[H('div',{innerHTML:html})])])}
+
+function workloadStackSec(){const sec=document.createElement('section');sec.className='card';sec.innerHTML=`<div class='row'><strong>Workload by Member (stacked)</strong><div class='sp'></div></div>`;const wrap=document.createElement('div');wrap.className='vchart';const Htot=180;const Sx=stacks(false);const M=Math.max(Sx.mx,1);const idx=new Map(S.tasks.map(x=>[x.id,x]));Sx.rows.forEach(r=>{const col=document.createElement('div');col.className='vcol';const stk=document.createElement('div');stk.className='vstack';(r.seg||[]).forEach(s=>{const seg=document.createElement('div');seg.className='vseg';seg.style.height=Math.max(2,(s.wd/M)*Htot)+'px';seg.style.background=s.color||'#777';seg.dataset.task=s.id||'';seg.dataset.member=r.name;const t=idx.get(s.id);const det=t?`${t.type} ${t.number||''}
+${t.criticality||'Low'} • ${t.hours||''}
+Start ${t.date||'—'} • Due ${t.due||'—'}
+${(t.members||[]).join(', ')}
+${t.notes||t.link||''}`:`${s.type}`;seg.title=det;stk.appendChild(seg)});col.appendChild(stk);const lab=document.createElement('div');lab.className='vlabel';lab.textContent=r.name;col.appendChild(lab);wrap.appendChild(col)});sec.appendChild(wrap);sec.addEventListener('contextmenu',e=>{const seg=e.target.closest('[data-task]');if(seg){e.preventDefault();openTaskMenu(e,seg.dataset.task,seg.dataset.member)}});return sec}
+
+function alertsSec(){const sec=document.createElement('section');const mems=members(),mset=new Set(mems.map(m=>m.name)),ts=tasks(),alerts=[],crit=new Set(['Escalation','UA','TAR']);
+  ts.forEach(t=>{if(!crit.has(t.type))return;const mm=(t.members||[]).filter(m=>mset.has(m));if(mm.length===1)alerts.push({sev:'High',msg:`Critical ${t.type} ${t.number||'no id'} single owner ${mm[0]}`});if(!t.number||!t.link)alerts.push({sev:'Medium',msg:`Critical ${t.type} missing ${!t.number?'ID':''}${!t.number&&!t.link?' & ':''}${!t.link?'Link':''}`})});
+  mems.forEach(m=>{const has=ts.some(t=>(t.members||[]).includes(m.name));if(!has)alerts.push({sev:'Low',msg:`${m.name} has no tasks in window`})});
+  const col=s=>s==='High'?'var(--bad)':s==='Medium'?'var(--warn)':'#6aa7d6';
+  sec.className='card';sec.innerHTML=`<div class='row'><strong>Risk alerts</strong><div class='sp'></div><span class='mini'>${alerts.length?alerts.length+' found':'All clear'}</span></div>${alerts.length?`<div class='grid' style='margin-top:8px'>${A(a=>`<div class='row' style='gap:8px'><span class='pill' style='background:${col(a.sev)}22;border-color:${col(a.sev)}'><span class='sw' style='background:${col(a.sev)}'></span>${a.sev}</span><div class='mini'>${a.msg}</div></div>`,alerts)}</div>`:`<div class='mini' style='margin-top:8px'>All clear</div>`}`;return sec}
+
+function chart(box,entries,max){box.innerHTML='';const h=box.clientHeight||200,M=Math.max(max||Math.max(...entries.map(e=>e.v),1),1),w=90/Math.max(1,entries.length);entries.forEach((e,i)=>{const b=document.createElement('div');b.className='bar';b.style.cssText=`height:${(e.v/M)*(h-30)}px;left:${(i/entries.length)*100}%;width:${w}%;background:${e.c||'var(--pri)'}`;b.title=`${e.k}: ${e.v}`;box.appendChild(b)})}
+
+function renderAna(){const root=$('#anaRoot'),f=S.ana;root.innerHTML=box('Analytics Filters',filtersUI(f,'a'))+"<div class='grid g2' id='abox'></div>"+"<div class='grid g2'><div class='card'><h4>Tasks by Type</h4><div id='chart1' class='chart'></div></div><div class='card'><h4>Tasks by Criticality</h4><div id='chart2' class='chart'></div></div></div>"+"<div class='grid g2'><div class='card'><h4>Workload (weighted)</h4><div id='chart3' class='chart'></div></div><div class='card'><h4>Member Performance</h4><div id='chart5' class='chart'></div></div></div>"+"<div class='grid g2'><div class='card'><h4>Overdue</h4><div id='overdue'></div></div><div></div></div>";
+  wireFilters(root.querySelector('.card'),'a');
+  const mems=members(true),Sx=stacks(true),TT=tasks({ana:true}).length,TW=Sx.rows.reduce((s,r)=>s+r.tw,0),TH=Sx.rows.reduce((s,r)=>s+r.th,0),AVG=mems.length?(TW/mems.length).toFixed(2):0;
+  $('#abox').innerHTML=A(([k,v])=>`<div class='card'><div class='row'><div class='sp'></div><div style='text-align:center'><div style='font-size:24px;font-weight:bold'>${v}</div><div class='mini'>${k}</div></div><div class='sp'></div></div></div>`,[['Total Tasks',TT],['Weighted Total',TW.toFixed(2)],['Total Hours',TH],['Avg per Member',AVG]]);
+  const t1={};tasks({ana:true}).forEach(t=>t1[t.type]=(t1[t.type]||0)+1);chart($('#chart1'),Object.entries(t1).map(([k,v])=>({k,v,c:S.deliverables[k]?.color})));
+  const t2={Low:0,Medium:0,High:0};tasks({ana:true}).forEach(t=>t2[t.criticality||'Low']++);chart($('#chart2'),Object.entries(t2).map(([k,v])=>({k,v,c:k==='High'?'#ff6b6b':k==='Medium'?'#ffcc00':'#00c896'})));
+  chart($('#chart3'),Sx.rows.map(r=>({k:r.name,v:r.tw,c:'#6a5af9'})));
+  const perf={};tasks({needMem:true,ana:true}).forEach(t=>(t.members||[]).forEach(m=>perf[m]=(perf[m]||0)+1));chart($('#chart5'),Object.entries(perf).map(([k,v])=>({k,v,c:'#985eff'})));
+  const over=tasks({ana:true}).filter(t=>t.due&&t.due<today);$('#overdue').innerHTML=over.length?A(t=>`<div class='row'><span class='pill' style='background:${(S.deliverables[t.type]?.color||'#999')}22'><span class='sw' style='background:${S.deliverables[t.type]?.color||'#999'}'></span>${t.type}</span><div class='mini'>${t.number||'—'} • Due ${t.due}</div><div class='sp'></div><button class='btn mini' data-act='task-edit' data-id='${t.id}'>Edit</button></div>`,over):"<div class='mini'>None 🎉</div>";
+}
+
+function renderTime(){const cal=$('#cal'),hdr=$('#monthLbl'),names=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];hdr.textContent=`${names[month.getMonth()]} ${month.getFullYear()}`;cal.innerHTML='';['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>cal.appendChild(H('div',{class:'mini',style:'text-align:center'},[d])));const first=new Date(month.getFullYear(),month.getMonth(),1),last=new Date(month.getFullYear(),month.getMonth()+1,0);for(let i=0;i<first.getDay();i++)cal.appendChild(H('div',{class:'day'}));const todayD=dateOnly(new Date());for(let day=1;day<=last.getDate();day++){const d=new Date(month.getFullYear(),month.getMonth(),day),cell=H('div',{class:'day'});if(dateOnly(d).getTime()===todayD.getTime())cell.classList.add('cur');const list=S.tasks.filter(t=>t.date===fmt(d));cell.appendChild(H('div',{class:'daynum'},[day]));const icons=H('div',{class:'icons'});list.slice(0,6).forEach(t=>icons.appendChild(H('div',{class:'dot',title:`${t.type} ${t.number||''}`,style:`background:${S.deliverables[t.type]?.color||'#777'}`})));cell.appendChild(icons);if(list.length){cell.addEventListener('click',()=>{$('#selDate').textContent=d.toDateString();$('#dateTasks').innerHTML=A(t=>`<div class='card' style='margin-bottom:8px'><div class='row'><span class='pill' data-dlv='${t.type}' title='Right‑click for options' style='background:${(S.deliverables[t.type]?.color||'#999')}22'><span class='sw' style='background:${S.deliverables[t.type]?.color||'#999'}'></span>${t.type}</span><span class='mini'>${t.number||'—'}</span><div class='sp'></div><span class='mini'>${t.hours||'—'}</span></div><div class='mini ellipsis'>${t.notes||t.link||''}</div><div class='mini'>${(t.members||[]).join(', ')}</div></div>`,list)})}cal.appendChild(cell)}}
+
+function renderAwards(){const box=$('#awardsBox');box.innerHTML=S.awards.length?A(a=>`<div class='card'><div class='row'><strong>${a.recipient}</strong><div class='sp'></div><span class='badge mini'>${a.type}</span></div><div class='mini' style='margin-top:6px'>${a.description}</div><div class='mini' style='margin-top:6px'>Awarded on: ${a.date}</div><button class='btn mini' data-act='award-del' data-id='${a.id}'>Delete</button></div>`,S.awards):"<div class='mini'>No awards</div>"}
+
+function dash(){const app=$('#app');
+  // Totals FIRST (per request), then Filters, then the rest
+  app.innerHTML=""; app.append(totalsSec());
+  const filtBox=document.createElement('div');filtBox.innerHTML=box('Filters',filtersUI(S.filters,'f')); app.appendChild(filtBox.firstChild);
+  wireFilters($('#app .card'), 'f');
+  app.append(workloadStackSec(),delivSec(),membersSec());
+}
+
+function render(){save();$('#counters').textContent=`Dlv:${Object.keys(S.deliverables).length} • Mem:${S.members.length} • Tasks:${S.tasks.length} • Awards:${S.awards.length}`;if($('#dash').classList.contains('active'))dash();if($('#ana').classList.contains('active'))renderAna();if($('#time').classList.contains('active'))renderTime();if($('#awards').classList.contains('active'))renderAwards();if($('#alerts').classList.contains('active'))$('#alertsBox').replaceChildren(alertsSec())}
+
+// ===== Right‑click menu — Deliverables only =====
+const menu=$('#ctx'),hd=$('#ctxHd'),btns=$('#ctxBtns');
+function clamp(p,max){return Math.max(8,Math.min(p,max-8))}
+function openDeliverableMenu(ev,name){hd.textContent=`Deliverable: ${name}`;const items=[["Rename","d-ren",{name}],["Set Color","d-col",{name}],["Set Weight","d-w",{name}],["Delete","d-del",{name}]];btns.innerHTML=A(([l,a,d])=>`<button data-act='${a}' data-p='${encodeURIComponent(JSON.stringify(d))}'>${l}</button>`,items);const vw=window.innerWidth,vh=window.innerHeight;menu.style.left=clamp(ev.clientX,vw)+"px";menu.style.top=clamp(ev.clientY,vh)+"px";menu.classList.add('active');menu.setAttribute('aria-hidden','false')}
+function openTaskMenu(ev,id,member){const t=S.tasks.find(x=>x.id===id);if(!t)return;hd.textContent=`Task: ${t.type} ${t.number||''}`;const items=[[`Unassign from ${member}`,'t-unassign',{id,member}],["Delete Task",'t-del',{id}]];btns.innerHTML=A(([l,a,d])=>`<button data-act='${a}' data-p='${encodeURIComponent(JSON.stringify(d))}'>${l}</button>`,items);const vw=window.innerWidth,vh=window.innerHeight;menu.style.left=clamp(ev.clientX,vw)+"px";menu.style.top=clamp(ev.clientY,vh)+"px";menu.classList.add('active');menu.setAttribute('aria-hidden','false')}
+function closeMenu(){menu.classList.remove('active');menu.setAttribute('aria-hidden','true')}
+
+document.addEventListener('click',e=>{if(!e.target.closest('#ctx'))closeMenu()});
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('[data-dlv]')&&!e.target.closest('[data-task]')&&!e.target.closest('#ctx'))closeMenu()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+
+// ===== actions =====
+const ACT={"d-del":p=>{if(confirm('Remove deliverable?')){push();delete S.deliverables[p.name];S.tasks.forEach(t=>{if(t.type===p.name)t.type='(deleted)'});closeMenu();render()}},"d-ren":p=>{const old=p.name,cur=S.deliverables[old];if(!cur)return;const nn=prompt('New name',old);if(!nn||nn===old||S.deliverables[nn])return;push();S.deliverables[nn]=cur;delete S.deliverables[old];S.tasks.forEach(t=>{if(t.type===old)t.type=nn});closeMenu();render()},"d-col":p=>{const name=p.name,cur=S.deliverables[name]?.color||'#888',nc=prompt('Hex color',cur);if(!nc)return;push();S.deliverables[name].color=nc;closeMenu();render()},"d-w":p=>{const name=p.name,cur=S.deliverables[name]?.weight??1,w=+prompt('Weight',cur);if(Number.isNaN(w))return;push();S.deliverables[name].weight=w;closeMenu();render()},"month":p=>{month.setMonth(month.getMonth()+(+p.delta||0));renderTime()},"modal-close":p=>{document.querySelector(p.target).style.display='none'},"open-task":()=>openTask(),"open-member":()=>openMember(),"open-award":()=>openAward(),"import":()=>impCSV(),"export":()=>expCSV(),"member-edit":b=>openMember(b.member),"task-edit":b=>editTask(b.id),"award-del":b=>{if(!confirm('Delete award?'))return;push();S.awards=S.awards.filter(a=>a.id!==b.id);render()},"t-del":p=>{if(!confirm('Delete this task?'))return;push();S.tasks=S.tasks.filter(t=>t.id!==p.id);closeMenu();render()},"t-unassign":p=>{const t=S.tasks.find(x=>x.id===p.id);if(!t)return;push();t.members=(t.members||[]).filter(n=>n!==p.member);if(!t.members.length){if(confirm('No owners left. Delete task?')){S.tasks=S.tasks.filter(x=>x.id!==p.id)}}closeMenu();render()}};
+
+document.body.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act;const payload={};for(const a of ['id','member','name','delta','target'])if(b.dataset[a]!=null)payload[a]=b.dataset[a];if(b.dataset.p){try{Object.assign(payload,JSON.parse(decodeURIComponent(b.dataset.p)))}catch{}}ACT[act]&&ACT[act](payload)});
+$('#ctx').addEventListener('click',e=>{const btn=e.target.closest('[data-act]');if(!btn)return;const act=btn.dataset.act;const payload={};if(btn.dataset.p)Object.assign(payload,JSON.parse(decodeURIComponent(btn.dataset.p)));ACT[act]&&ACT[act](payload)});
+
+// ===== modals =====
+function openTask(id){const m=$('#taskM'),f=$('#taskF');$('#taskTitle').textContent=id?'Edit Task':'Add Task';f.reset();f.type.innerHTML=A(k=>`<option>${k}</option>`,Object.keys(S.deliverables));$('#taskMembers').innerHTML=A(m=>`<label style='display:flex;gap:6px;align-items:center'><input type='checkbox' name='members' value='${m.name}'/><span class='mini'>${m.name}</span></label>`,S.members);f.date.value=fmt(new Date());f.id.value=id||'';if(id){const t=S.tasks.find(x=>x.id===id);if(t){f.type.value=t.type;f.number.value=t.number||'';f.hours.value=t.hours||'0-2';f.criticality.value=t.criticality||'Low';f.date.value=t.date||fmt(new Date());f.due.value=t.due||'';f.notes.value=t.notes||'';f.link.value=t.link||'';f.shoutout.checked=!!t.shoutout;[...f.querySelectorAll('[name="members"]')].forEach(cb=>cb.checked=(t.members||[]).includes(cb.value))}}m.style.display='grid'}
+function openMember(name){const m=$('#memM'),f=$('#memF');f.reset();if(name){const p=S.members.find(x=>x.name===name);if(p){f.name.value=p.name;f.shift.value=p.shift;f.days.value=p.days;f.country.value=p.country}}m.style.display='grid'}
+function openAward(){const m=$('#awardM'),f=$('#awardF');f.reset();f.date.value=today;f.recipient.innerHTML=A(x=>`<option>${x.name}</option>`,S.members);m.style.display='grid'}
+function editTask(id){openTask(id)}
+
+$('#taskF').onsubmit=e=>{e.preventDefault();const f=e.target,sel=[...f.querySelectorAll('[name="members"]:checked')].map(x=>x.value);if(!sel.length)return alert('Pick at least one member');const data={id:f.id.value||uid(),type:f.type.value,number:f.number.value,hours:f.hours.value,criticality:f.criticality.value,date:f.date.value,due:f.due.value,members:sel,notes:f.notes.value,link:f.link.value,shoutout:f.shoutout.checked};push();const i=S.tasks.findIndex(t=>t.id===data.id);i>-1?S.tasks[i]=data:S.tasks.push(data);$('#taskM').style.display='none';render()};
+$('#memF').onsubmit=e=>{e.preventDefault();const f=e.target,d={name:f.name.value,shift:f.shift.value,days:f.days.value,country:f.country.value};push();const i=S.members.findIndex(m=>m.name===d.name);i>-1?S.members[i]=d:S.members.push(d);$('#memM').style.display='none';render()};
+$('#awardF').onsubmit=e=>{e.preventDefault();const f=e.target;push();S.awards.push({id:uid(),type:f.type.value,recipient:f.recipient.value,description:f.description.value,date:f.date.value});$('#awardM').style.display='none';render()};
+
+// ===== CSV =====
+function expCSV(){
+  const csvTasks=["Type,Number,Hours,Criticality,Members,StartDate,DueDate,Shoutout,Link,Notes",
+    ...S.tasks.map(x=>[x.type,x.number||'',x.hours||'0-2',x.criticality||'Low',(x.members||[]).join('; '),x.date||'',x.due||'',x.shoutout?'shoutout':'',x.link||'',x.notes||''].map(csvCell).join(','))
+  ].join("\n");
+  const csvMembers=["Name,Shift,Days,Country",
+    ...S.members.map(m=>[m.name,m.shift,m.days,m.country].map(csvCell).join(','))
+  ].join("\n");
+  const csvAwards=["Type,Recipient,Description,Date",
+    ...S.awards.map(a=>[a.type,a.recipient,a.description,a.date||''].map(csvCell).join(','))
+  ].join("\n");
+  const blob=new Blob([csvTasks+"\n\n"+csvMembers+"\n\n"+csvAwards],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`tase-${today}.csv`;
+  document.body.appendChild(a);a.click();URL.revokeObjectURL(url);a.remove();
+}
+function impCSV(){
+  const input=$('#csv');
+  input.onchange=e=>{
+    const file=e.target.files[0];
+    if(!file) return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const LINE_SPLIT=new RegExp('\r?\n');
+        const lines=String(ev.target.result).split(LINE_SPLIT).filter(Boolean);
+        const head=lines.shift().split(',').map(h=>h.trim().toLowerCase());
+        const get=(arr,k)=>{const i=head.indexOf(k);return i>-1?(arr[i]||'').trim():''};
+        if(head.includes('type')&&head.includes('number')&&head.includes('hours')){
+          push();
+          S.tasks=lines.map(line=>{const v=line.split(',');return{
+            id:uid(),type:get(v,'type'),number:get(v,'number'),hours:get(v,'hours'),
+            criticality:get(v,'criticality')||'Low',
+            members:get(v,'members')?get(v,'members').split(';').map(s=>s.trim()):[],
+            date:get(v,'startdate')||get(v,'date'),
+            due:get(v,'duedate')||get(v,'due'),
+            shoutout:get(v,'shoutout')==='shoutout',
+            link:get(v,'link'),notes:get(v,'notes')
+          }}).filter(t=>t.type);
+        } else if(head.includes('name')&&head.includes('shift')&&head.includes('days')){
+          push();
+          S.members=lines.map(line=>{const v=line.split(',');return{name:get(v,'name'),shift:get(v,'shift'),days:get(v,'days'),country:get(v,'country')}}).filter(m=>m.name);
+        } else if(head.includes('type')&&head.includes('recipient')&&head.includes('description')){
+          push();
+          S.awards=lines.map(line=>{const v=line.split(',');return{id:uid(),type:get(v,'type'),recipient:get(v,'recipient'),description:get(v,'description'),date:get(v,'date')}}).filter(a=>a.type);
+        } else {
+          alert('Unknown CSV');
+        }
+        render();
+      }catch(err){ alert('CSV error '+err.message); }
+    };
+    r.readAsText(file);
+  };
+  input.click();
+}
+
+// ===== wiring =====
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tabpane').forEach(c=>c.classList.remove('active'));t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');render()}));
+
+document.addEventListener('click',e=>{const m=e.target.closest('.overlay');if(m&&e.target===m)m.style.display='none'});
+$('#undo').onclick=()=>undo();$('#redo').onclick=()=>redo();
+render();
+})();</script>
+</body></html>
